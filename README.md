@@ -1,5 +1,5 @@
 # CampConnect — Firebase Deployment Guide
-**Cloud System Analyst Project | Grace Community Church**
+**Cloud System Analyst Project | AHFJC**
 
 ---
 
@@ -178,5 +178,5 @@ firebase firestore:delete --all-collections  # Clear all data (careful!)
 
 ---
 
-*Built for Grace Community Church Summer Camp 2024*
+*Built for AHFJC Summer Camp 2024*
 *Firebase Hosting + Firestore + Authentication*
