@@ -61,6 +61,7 @@
 <!-- Top Nav -->
 <header class="topnav">
   <div class="topnav-inner">
+    <button id="mobile-menu-btn" aria-label="Open menu" class="mobile-menu-btn">&#9776;</button>
     <a href="/" class="brand">Camp<span style="color:var(--accent);">Connect</span></a>
     <div style="display:flex;align-items:center;gap:12px;">
       <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;background:var(--surface-low);border-radius:99px;border:1px solid var(--outline-variant);">
@@ -213,7 +214,22 @@
       <a href="#">Security Whitepaper</a>
     </div>
   </div>
-</footer>
+  </footer>
+
+  <div class="mobile-nav-overlay" id="mobile-nav-overlay"></div>
+  <nav class="mobile-nav" id="mobile-nav" aria-hidden="true">
+    <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+      <a href="/" class="brand">Camp<span style="color:var(--accent);">Connect</span></a>
+      <button aria-label="Close menu" class="mobile-nav-close" onclick="document.body.classList.remove('nav-open')">✕</button>
+    </div>
+    <a href="/pages/dashboard.html" class="nav-link">Dashboard</a>
+    <a href="#" class="nav-link">Registrations</a>
+    <a href="/pages/attendance.html" class="nav-link">Attendance</a>
+    <a href="/pages/member.html" class="nav-link">Member</a>
+    <a href="#" class="nav-link">Settings</a>
+  </nav>
+
+  <script src="/js/mobile-nav.js" defer></script>
 
 <script type="module">
 import {
