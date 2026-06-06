@@ -178,5 +178,5 @@ firebase firestore:delete --all-collections  # Clear all data (careful!)
 
 ---
 
-*Built for AHFJC Summer Camp 2024*
+*Built for AHFJC Youth Conference 2026*
 *Firebase Hosting + Firestore + Authentication*
