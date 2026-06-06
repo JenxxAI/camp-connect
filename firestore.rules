@@ -1,0 +1,97 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ── Helper functions ──────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    // Use JWT custom claims (set via Admin SDK setCustomUserClaims)
+    // Much faster than Firestore get() lookups — no extra read charge
+    function getRole() {
+      return request.auth.token.role;
+    }
+
+    function isVerified() {
+      return request.auth.token.email_verified == true;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && isVerified() && getRole() == 'admin';
+    }
+
+    function isRegistrar() {
+      return isAuthenticated() && isVerified() && getRole() in ['admin', 'registrar'];
+    }
+
+    function isEditor() {
+      return isAuthenticated() && isVerified() && getRole() in ['admin', 'registrar', 'editor'];
+    }
+
+    // Classification-based read access for notes
+    // PUBLIC  → any verified user
+    // INTERNAL → editor, registrar, admin
+    // CONFIDENTIAL → admin only
+    function canReadNote(cls) {
+      return cls == 'PUBLIC'
+        || (cls == 'INTERNAL' && isEditor())
+        || (cls == 'CONFIDENTIAL' && isAdmin());
+    }
+
+    // ── Users ─────────────────────────────────────────────────
+    match /users/{userId} {
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write: if isAdmin();
+    }
+
+    // ── Registrations ─────────────────────────────────────────
+    match /registrations/{registrationId} {
+      allow read: if isRegistrar()
+        || (isAuthenticated() && isVerified() && resource.data.userId == request.auth.uid);
+      allow create: if isAuthenticated() && isVerified();
+      allow update: if isRegistrar()
+        || (isAuthenticated() && isVerified() && resource.data.userId == request.auth.uid);
+      allow delete: if isAdmin();
+    }
+
+    // ── Attendance ────────────────────────────────────────────
+    match /attendance/{recordId} {
+      allow read: if isRegistrar();
+      allow write: if isRegistrar();
+    }
+
+    // ── Notes (with classification) ───────────────────────────
+    match /notes/{noteId} {
+      // Read access depends on the note's _classification label
+      allow read: if isAuthenticated() && isVerified()
+        && canReadNote(resource.data._classification);
+
+      // Only editors+ can create; must include required fields
+      allow create: if isEditor()
+        && request.resource.data.keys().hasAll([
+          '_classification', '_owner', '_createdAt'
+        ]);
+
+      // Owner can update their own notes
+      allow update: if isAuthenticated() && isVerified()
+        && request.auth.uid == resource.data._owner;
+
+      // Only admins can delete
+      allow delete: if isAdmin();
+    }
+
+    // ── Audit logs (immutable) ────────────────────────────────
+    match /audit_logs/{logId} {
+      allow read:   if isAdmin();
+      allow create: if isAuthenticated();
+      // No update or delete — tamper-proof by omission
+    }
+
+    // ── Sessions / Events ─────────────────────────────────────
+    match /sessions/{sessionId} {
+      allow read:  if isAuthenticated() && isVerified();
+      allow write: if isAdmin();
+    }
+  }
+}

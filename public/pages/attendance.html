@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8"/>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+  <title>CampConnect — Daily Attendance</title>
+  <link rel="stylesheet" href="/css/shared.css"/>
+  <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:wght,FILL@100..700,0..1&display=swap"/>
+  <style>
+    .attendance-header { display:flex; flex-wrap:wrap; justify-content:space-between; align-items:flex-end; gap:16px; margin-bottom:28px; }
+    .counter-group { display:flex; gap:12px; }
+    .counter-box { padding:14px 20px; border-radius:var(--radius-md); text-align:center; min-width:80px; }
+    .counter-label { font-size:10px; font-weight:700; font-family:var(--font-mono); letter-spacing:0.06em; text-transform:uppercase; }
+    .counter-num { font-family:var(--font-display); font-size:28px; font-weight:800; line-height:1.1; margin-top:2px; }
+
+    .bento { display:grid; grid-template-columns:2fr 1fr; gap:20px; }
+    @media(max-width:900px) { .bento { grid-template-columns:1fr; } }
+
+    .roster-card { overflow:hidden; }
+    .roster-header { padding:14px 20px; background:var(--surface-low); border-bottom:1px solid var(--outline-variant); display:flex; justify-content:space-between; align-items:center; }
+    .roster-header h3 { font-size:17px; font-weight:700; display:flex; align-items:center; gap:8px; color:var(--primary); }
+
+    .camper-row { display:flex; align-items:center; justify-content:space-between; padding:14px 20px; border-bottom:1px solid var(--outline-variant); transition:var(--transition); }
+    .camper-row:hover { background:var(--surface-low); }
+    .camper-row:last-child { border-bottom:none; }
+    .camper-avatar { width:44px; height:44px; border-radius:50%; border:2px solid var(--outline-variant); object-fit:cover; font-weight:700; display:flex; align-items:center; justify-content:center; font-size:16px; background:var(--surface-high); color:var(--primary); flex-shrink:0; }
+    .camper-name { font-size:15px; font-weight:700; color:var(--on-surface); }
+    .camper-note { font-size:12px; color:var(--on-surface-variant); display:flex; align-items:center; gap:4px; margin-top:2px; }
+    .note-error { color:var(--error); }
+
+    .toggle-group { display:flex; background:var(--surface-high); border-radius:99px; padding:3px; border:1px solid var(--outline-variant); gap:2px; }
+    .toggle-btn { padding:6px 14px; border-radius:99px; border:none; font-family:var(--font-body); font-size:12px; font-weight:600; cursor:pointer; transition:var(--transition); background:transparent; color:var(--on-surface-variant); }
+    .toggle-btn.present { background:var(--accent); color:var(--accent-dark); }
+    .toggle-btn.excused { background:var(--surface-highest); color:var(--on-surface); }
+    .toggle-btn.absent  { background:var(--error-container); color:var(--error-on); }
+
+    /* Sidebar widgets */
+    .notes-card { padding:20px; }
+    .notes-card h3 { font-size:15px; font-weight:700; margin-bottom:14px; display:flex; align-items:center; gap:8px; }
+    .alerts-card { border-color:#fca5a5 !important; }
+    .alerts-card .alert-header { padding:14px 18px; background:var(--error-container); border-radius:12px 12px 0 0; display:flex; align-items:center; gap:8px; }
+    .alerts-card .alert-header h3 { font-size:15px; font-weight:700; color:var(--error-on); margin:0; }
+    .alert-item { display:flex; gap:12px; padding:14px 18px; border-top:1px solid #fca5a5; }
+    .alert-item .material-symbols-outlined { color:var(--error-on); font-size:18px; flex-shrink:0; margin-top:1px; }
+    .alert-item-title { font-size:13px; font-weight:700; color:var(--error-on); }
+    .alert-item-body { font-size:12px; color:#b91c1c; margin-top:2px; }
+
+    .loading-campers { text-align:center; padding:40px; color:var(--on-surface-variant); }
+    .mark-all-row { padding:10px 20px; background:var(--surface-low); border-bottom:1px solid var(--outline-variant); display:flex; gap:8px; }
+  </style>
+</head>
+<body class="loading">
+<div id="toast-container"></div>
+
+<!-- Auth loading -->
+<div class="auth-loading" style="position:fixed;inset:0;background:white;z-index:9999;display:flex;align-items:center;justify-content:center;flex-direction:column;gap:12px;">
+  <div class="spinner" style="width:32px;height:32px;border-width:3px;"></div>
+  <p style="font-size:14px;color:var(--on-surface-variant);">Loading…</p>
+</div>
+
+<!-- Top Nav -->
+<header class="topnav">
+  <div class="topnav-inner">
+    <a href="/" class="brand">Camp<span style="color:var(--accent);">Connect</span></a>
+    <div style="display:flex;align-items:center;gap:12px;">
+      <div style="display:flex;align-items:center;gap:6px;padding:6px 14px;background:var(--surface-low);border-radius:99px;border:1px solid var(--outline-variant);">
+        <span class="material-symbols-outlined" style="font-size:16px;color:var(--on-surface-variant);">search</span>
+        <input id="search-input" type="text" placeholder="Search campers…" style="background:none;border:none;outline:none;font-size:13px;width:160px;"/>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;padding-left:12px;border-left:1px solid var(--outline-variant);">
+        <span style="font-size:11px;font-family:var(--font-mono);color:var(--on-surface-variant);">ADMIN ROLE</span>
+        <div id="user-avatar" style="width:32px;height:32px;border-radius:50%;background:var(--surface-high);border:1px solid var(--outline-variant);overflow:hidden;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:13px;color:var(--primary);"></div>
+      </div>
+    </div>
+  </div>
+</header>
+
+<div class="app-layout auth-required">
+  <!-- Sidebar -->
+  <aside class="sidebar">
+    <div class="sidebar-org">
+      <h2>Grace Community</h2>
+      <p>Summer Camp 2024</p>
+    </div>
+    <nav style="flex:1;display:flex;flex-direction:column;gap:4px;">
+      <a href="/pages/dashboard.html" class="nav-link">
+        <span class="material-symbols-outlined">dashboard</span> Home
+      </a>
+      <a href="#" class="nav-link">
+        <span class="material-symbols-outlined">how_to_reg</span> Registrations
+      </a>
+      <a href="/pages/attendance.html" class="nav-link active">
+        <span class="material-symbols-outlined" style="font-variation-settings:'FILL' 1;">fact_check</span> Attendance
+      </a>
+      <a href="/pages/dashboard.html" class="nav-link">
+        <span class="material-symbols-outlined">security</span> Security Logs
+      </a>
+      <a href="#" class="nav-link">
+        <span class="material-symbols-outlined">settings</span> Settings
+      </a>
+    </nav>
+    <div style="margin-top:auto;">
+      <button class="btn btn-accent" style="width:100%;justify-content:center;margin-bottom:16px;" onclick="window.location.href='/index.html#registration-form'">
+        <span class="material-symbols-outlined">add</span> New Registration
+      </button>
+      <div style="border-top:1px solid var(--outline-variant);padding-top:12px;display:flex;flex-direction:column;gap:4px;">
+        <a href="#" class="nav-link" style="font-size:12px;"><span class="material-symbols-outlined" style="font-size:16px;">help</span> Help Center</a>
+        <a href="#" class="nav-link" style="font-size:12px;"><span class="material-symbols-outlined" style="font-size:16px;">policy</span> Privacy Policy</a>
+      </div>
+    </div>
+  </aside>
+
+  <!-- Main Content -->
+  <main class="main-content">
+    <!-- Header -->
+    <div class="attendance-header">
+      <div>
+        <h1 style="font-size:26px;font-weight:800;color:var(--primary);">Daily Attendance: Cabin 7</h1>
+        <p style="color:var(--on-surface-variant);margin-top:4px;" id="session-label">Wednesday, July 17th — Morning Session</p>
+      </div>
+      <div class="counter-group">
+        <div class="counter-box card">
+          <div class="counter-label" style="color:var(--on-surface-variant);">Total</div>
+          <div class="counter-num" id="cnt-total">—</div>
+        </div>
+        <div class="counter-box" style="background:#dcfce7;border:1px solid #bbf7d0;">
+          <div class="counter-label" style="color:#166534;">Present</div>
+          <div class="counter-num" style="color:#15803d;" id="cnt-present">—</div>
+        </div>
+        <div class="counter-box" style="background:var(--error-container);border:1px solid #fca5a5;">
+          <div class="counter-label" style="color:var(--error-on);">Absent</div>
+          <div class="counter-num" style="color:var(--error);" id="cnt-absent">—</div>
+        </div>
+      </div>
+    </div>
+
+    <div class="bento">
+      <!-- Roster Card -->
+      <div class="card roster-card">
+        <div class="roster-header">
+          <h3>
+            <span class="material-symbols-outlined">checklist</span>
+            Member Roster
+          </h3>
+          <button class="btn btn-primary" id="submit-btn" style="font-size:13px;padding:8px 16px;">
+            <span class="material-symbols-outlined" style="font-size:16px;">send</span>
+            Submit Report
+          </button>
+        </div>
+
+        <!-- Bulk actions -->
+        <div class="mark-all-row">
+          <span style="font-size:12px;color:var(--on-surface-variant);margin-right:8px;align-self:center;font-family:var(--font-mono);">MARK ALL:</span>
+          <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" id="mark-all-present">✓ Present</button>
+          <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" id="mark-all-excused">Excused</button>
+          <button class="btn btn-ghost" style="font-size:12px;padding:5px 12px;" id="mark-all-absent">Absent</button>
+        </div>
+
+        <div id="roster-list">
+          <div class="loading-campers"><div class="spinner" style="margin:0 auto;"></div></div>
+        </div>
+      </div>
+
+      <!-- Sidebar -->
+      <div style="display:flex;flex-direction:column;gap:16px;">
+        <!-- Session Notes -->
+        <div class="card notes-card">
+          <h3>
+            <span class="material-symbols-outlined" style="color:var(--accent);">sticky_note_2</span>
+            Session Notes
+          </h3>
+          <textarea id="session-notes" rows="5" style="width:100%;border:1.5px solid var(--outline-variant);border-radius:var(--radius-sm);padding:10px;font-family:var(--font-body);font-size:14px;resize:none;background:var(--surface-low);outline:none;" placeholder="Record incident reports, early pickups, or special observations..."></textarea>
+          <button class="btn btn-outline" style="width:100%;margin-top:10px;justify-content:center;" id="save-notes-btn">
+            Save Draft
+          </button>
+        </div>
+
+        <!-- Security Alerts -->
+        <div class="card alerts-card">
+          <div class="alerts-card alert-header">
+            <span class="material-symbols-outlined" style="color:var(--error-on);">report</span>
+            <h3>Security Alerts</h3>
+          </div>
+          <div class="alert-item">
+            <span class="material-symbols-outlined">verified_user</span>
+            <div>
+              <div class="alert-item-title">Missing Pickup Auth</div>
+              <div class="alert-item-body">Sophia Martinez needs signed release for 3:00 PM.</div>
+            </div>
+          </div>
+          <div class="alert-item">
+            <span class="material-symbols-outlined">water_drop</span>
+            <div>
+              <div class="alert-item-title">Hydration Reminder</div>
+              <div class="alert-item-body">Heat index rising. Ensure Cabin 7 takes 15 min water break.</div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<!-- Footer -->
+<footer class="footer auth-required">
+  <div class="footer-inner">
+    <div>
+      <a href="/" class="brand" style="font-size:16px;">Camp<span style="color:var(--accent);">Connect</span></a>
+      <p style="font-size:12px;color:var(--on-surface-variant);margin-top:2px;">© 2024 Church Management Systems.</p>
+    </div>
+    <div style="display:flex;gap:20px;">
+      <a href="#">Terms of Service</a>
+      <a href="#">Security Whitepaper</a>
+    </div>
+  </div>
+</footer>
+
+<script type="module">
+import {
+  auth, db, requireAuth, getUserRole, showToast, logAudit, formatDateTime,
+  collection, getDocs, addDoc, updateDoc, doc, getDoc, query, where, orderBy, serverTimestamp
+} from "/js/firebase-app.js";
+
+requireAuth(async (user) => {
+  // User avatar
+  const avatar = document.getElementById("user-avatar");
+  if (user.photoURL) {
+    avatar.innerHTML = `<img src="${user.photoURL}" style="width:100%;height:100%;object-fit:cover;"/>`;
+  } else {
+    avatar.textContent = (user.displayName || user.email || "?")[0].toUpperCase();
+  }
+
+  // ── Attendance state ──
+  const SESSION_ID = "summer_camp_2024";
+  const CABIN = "Cabin 7";
+  const TODAY = new Date().toISOString().slice(0, 10);
+  let attendanceState = {}; // { registrationId: "present"|"excused"|"absent" }
+  let campers = [];
+
+  // ── Load campers from registrations ──
+  async function loadCampers() {
+    try {
+      const snap = await getDocs(
+        query(collection(db, "registrations"),
+          where("sessionId", "==", SESSION_ID))
+      );
+      campers = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+      // Load today's existing attendance
+      const attSnap = await getDocs(
+        query(collection(db, "attendance"),
+          where("sessionId", "==", SESSION_ID),
+          where("date", "==", TODAY),
+          where("cabin", "==", CABIN))
+      );
+      attSnap.docs.forEach(d => {
+        attendanceState[d.data().registrationId] = d.data().status;
+      });
+
+      renderRoster(campers);
+    } catch (e) {
+      // Demo mode: show placeholder campers if no Firestore data
+      campers = [
+        { id:"demo1", name:"Benjamin Thompson", medical:"Peanut Allergy", status:"pending" },
+        { id:"demo2", name:"Sophia Martinez",   medical:"",                status:"waitlisted" },
+        { id:"demo3", name:"Liam O'Connor",      medical:"Early Departure (14:00)", status:"pending" },
+        { id:"demo4", name:"Emma Clarke",         medical:"",                status:"pending" },
+        { id:"demo5", name:"Noah Reyes",          medical:"Asthma",          status:"pending" },
+      ];
+      attendanceState = { demo1:"present", demo2:"absent", demo3:"present", demo4:"present", demo5:"present" };
+      renderRoster(campers);
+    }
+  }
+
+  function renderRoster(list) {
+    const el = document.getElementById("roster-list");
+    if (!list.length) {
+      el.innerHTML = `<div class="loading-campers">No campers registered for this session.</div>`;
+      updateCounters();
+      return;
+    }
+    el.innerHTML = list.map(c => {
+      const status = attendanceState[c.id] || "present";
+      const initials = (c.name || "?").split(" ").map(w => w[0]).join("").slice(0,2).toUpperCase();
+      return `
+      <div class="camper-row" data-id="${c.id}">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div class="camper-avatar">${initials}</div>
+          <div>
+            <div class="camper-name">${c.name || "—"}</div>
+            ${c.medical ? `<div class="camper-note note-error">
+              <span class="material-symbols-outlined" style="font-size:13px;">medical_services</span>${c.medical}
+            </div>` : ""}
+            ${c.status === "waitlisted" ? `<span class="badge badge-warning" style="margin-top:2px;">Waitlisted</span>` : ""}
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <div class="toggle-group">
+            <button class="toggle-btn ${status==='present'?'present':''}" data-status="present" data-id="${c.id}">Present</button>
+            <button class="toggle-btn ${status==='excused'?'excused':''}" data-status="excused" data-id="${c.id}">Excused</button>
+            <button class="toggle-btn ${status==='absent'?'absent':''}"  data-status="absent"  data-id="${c.id}">Absent</button>
+          </div>
+        </div>
+      </div>`;
+    }).join("");
+    updateCounters();
+    attachToggleListeners();
+  }
+
+  function attachToggleListeners() {
+    document.querySelectorAll(".toggle-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        const id = btn.dataset.id;
+        const status = btn.dataset.status;
+        attendanceState[id] = status;
+        // Update visual
+        const row = btn.closest(".camper-row");
+        row.querySelectorAll(".toggle-btn").forEach(b => {
+          b.className = "toggle-btn " + (b.dataset.status === status ? status : "");
+        });
+        updateCounters();
+      });
+    });
+  }
+
+  function updateCounters() {
+    const total   = campers.length;
+    const present = Object.values(attendanceState).filter(s => s === "present").length;
+    const absent  = Object.values(attendanceState).filter(s => s === "absent").length;
+    document.getElementById("cnt-total").textContent   = total;
+    document.getElementById("cnt-present").textContent = present;
+    document.getElementById("cnt-absent").textContent  = absent;
+  }
+
+  // Mark all
+  function markAll(status) {
+    campers.forEach(c => { attendanceState[c.id] = status; });
+    renderRoster(campers);
+  }
+  document.getElementById("mark-all-present").addEventListener("click", () => markAll("present"));
+  document.getElementById("mark-all-excused").addEventListener("click", () => markAll("excused"));
+  document.getElementById("mark-all-absent").addEventListener("click",  () => markAll("absent"));
+
+  // Search
+  document.getElementById("search-input").addEventListener("input", e => {
+    const q = e.target.value.toLowerCase();
+    const filtered = q ? campers.filter(c => c.name?.toLowerCase().includes(q)) : campers;
+    renderRoster(filtered);
+  });
+
+  // Save notes
+  document.getElementById("save-notes-btn").addEventListener("click", async () => {
+    const notes = document.getElementById("session-notes").value.trim();
+    showToast("Notes saved as draft.", "success");
+    await logAudit("Attendance_Notes", `Session notes saved for ${CABIN} on ${TODAY}`);
+  });
+
+  // Submit report
+  document.getElementById("submit-btn").addEventListener("click", async () => {
+    const btn = document.getElementById("submit-btn");
+    btn.disabled = true;
+    btn.innerHTML = `<div class="spinner" style="border-top-color:white;"></div> Submitting…`;
+    try {
+      const batch = campers.map(c => addDoc(collection(db, "attendance"), {
+        registrationId: c.id,
+        camperName:     c.name,
+        sessionId:      SESSION_ID,
+        cabin:          CABIN,
+        date:           TODAY,
+        status:         attendanceState[c.id] || "present",
+        notes:          document.getElementById("session-notes").value,
+        recordedBy:     user.uid,
+        recordedAt:     serverTimestamp()
+      }));
+      await Promise.all(batch);
+      await logAudit("Attendance_Submit",
+        `Attendance submitted for ${CABIN}, ${TODAY}. ${Object.values(attendanceState).filter(s=>s==="present").length}/${campers.length} present`);
+      showToast("Attendance report submitted!", "success");
+    } catch(e) {
+      showToast("Submit failed: " + e.message, "error");
+      await logAudit("Attendance_Submit", "Failed: " + e.message, "FAILED");
+    }
+    btn.disabled = false;
+    btn.innerHTML = `<span class="material-symbols-outlined" style="font-size:16px;">send</span> Submit Report`;
+  });
+
+  loadCampers();
+});
+</script>
+</body>
+</html>
